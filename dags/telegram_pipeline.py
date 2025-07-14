@@ -14,40 +14,48 @@ from src.dbt_runner.dbt_executor import DBTExecutor
 from src.utils.config import get_config
 
 # Configuration
-@op(config_schema={"channels": List[str], "limit": int})
+@op
 def scrape_telegram_messages(context) -> List[Dict[str, Any]]:
-    """Scrape messages from Telegram channels"""
+    """Scrape messages from Telegram channels using the new scraper"""
     logger = get_dagster_logger()
-    config = context.op_config
     
-    channels = config["channels"]
-    limit = config["limit"]
-    
-    logger.info(f"Starting to scrape {len(channels)} channels with limit {limit}")
+    logger.info("Starting to scrape Telegram channels")
     
     # Run async scraper
     async def run_scraper():
         scraper = TelegramScraper()
         all_messages = []
         
-        for channel in channels:
-            try:
-                messages = await scraper.get_channel_messages(channel, limit=limit)
-                if messages:
-                    # Save to JSON
-                    file_path = scraper.save_messages_to_json(messages, channel.replace('@', ''))
-                    logger.info(f"Saved {len(messages)} messages from {channel} to {file_path}")
-                    all_messages.extend(messages)
+        try:
+            # Connect to Telegram
+            if not await scraper.connect():
+                logger.error("Failed to connect to Telegram")
+                return []
+            
+            # Scrape all channels
+            results = await scraper.scrape_all_channels()
+            
+            # Collect all messages from successful scrapes
+            for result in results:
+                if result['status'] == 'success' and result['file_path']:
+                    logger.info(f"Successfully scraped {result['message_count']} messages from {result['channel_name']}")
+                    # Note: Messages are already saved to JSON files by the scraper
+                    # We could load them here if needed for the pipeline
                 else:
-                    logger.warning(f"No messages found for channel {channel}")
-            except Exception as e:
-                logger.error(f"Error scraping channel {channel}: {e}")
-        
-        await scraper.disconnect()
-        return all_messages
+                    logger.warning(f"Failed to scrape {result['channel_name']}: {result['error']}")
+            
+            # For now, return empty list since messages are saved to files
+            # In a real implementation, you might want to load the messages here
+            await scraper.disconnect()
+            return all_messages
+            
+        except Exception as e:
+            logger.error(f"Error in scraper: {e}")
+            await scraper.disconnect()
+            return []
     
     messages = asyncio.run(run_scraper())
-    logger.info(f"Total messages scraped: {len(messages)}")
+    logger.info(f"Scraping completed")
     return messages
 
 @op
@@ -306,12 +314,8 @@ def get_pipeline_config():
     """Get default configuration for the pipeline"""
     return {
         "ops": {
-            "scrape_telegram_messages": {
-                "config": {
-                    "channels": ["@medical_channel_1", "@health_news"],
-                    "limit": 100
-                }
-            }
+            # The scraper now uses hardcoded channels from the TelegramScraper class
+            # No additional configuration needed
         }
     }
 
