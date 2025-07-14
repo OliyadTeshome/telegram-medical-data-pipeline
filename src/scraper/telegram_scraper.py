@@ -12,7 +12,7 @@ from telethon.errors import (
     ChatAdminRequiredError,
     SessionPasswordNeededError
 )
-from telethon.tl.types import Message, Chat, User
+from telethon.tl.types import Message, Chat, User, MessageMediaPhoto, MessageMediaDocument
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -33,6 +33,7 @@ class TelegramScraper:
     """
     Asynchronous Telegram scraper using Telethon library.
     Scrapes messages from public channels and saves them in JSON format.
+    Also downloads image attachments.
     """
     
     def __init__(self):
@@ -114,6 +115,46 @@ class TelegramScraper:
             # For other objects, convert to string
             return str(value)
     
+    async def download_media(self, message: Message, channel_name: str) -> Optional[str]:
+        """
+        Download media from a message if it's an image
+        
+        Args:
+            message: Telegram message object
+            channel_name: Name of the channel
+            
+        Returns:
+            Optional[str]: Path to downloaded image or None if not an image
+        """
+        if not message.media:
+            return None
+        
+        try:
+            # Check if it's a photo
+            if isinstance(message.media, MessageMediaPhoto):
+                today = datetime.now().strftime('%Y-%m-%d')
+                base_path = 'data/raw/telegram_images'
+                channel_path = os.path.join(base_path, today, channel_name)
+                
+                # Create directory structure
+                os.makedirs(channel_path, exist_ok=True)
+                
+                # Generate filename using message ID
+                filename = f"{message.id}.jpg"
+                file_path = os.path.join(channel_path, filename)
+                
+                # Download the photo
+                await self.client.download_media(message.media, file_path)
+                
+                logger.info(f"Downloaded image: {file_path}")
+                return file_path
+                
+        except Exception as e:
+            logger.error(f"Error downloading media for message {message.id}: {e}")
+            return None
+        
+        return None
+    
     async def get_channel_messages(self, channel_url: str, limit: int = 1000) -> List[Dict[str, Any]]:
         """
         Extract messages from a Telegram channel
@@ -143,6 +184,9 @@ class TelegramScraper:
             message_count = 0
             async for message in self.client.iter_messages(channel, limit=limit):
                 if message and message.text:  # Only process text messages
+                    # Download media if present
+                    media_path = await self.download_media(message, channel_name)
+                    
                     message_data = {
                         'message_id': self._safe_serialize_value(message.id),
                         'chat_id': self._safe_serialize_value(message.chat_id),
@@ -155,6 +199,7 @@ class TelegramScraper:
                         'message_date': self._safe_serialize_value(message.date.isoformat()),
                         'has_media': self._safe_serialize_value(message.media is not None),
                         'media_type': self._safe_serialize_value(type(message.media).__name__ if message.media else None),
+                        'media_path': self._safe_serialize_value(media_path),
                         'reply_to_msg_id': self._safe_serialize_value(message.reply_to_msg_id),
                         'forward_from': self._safe_serialize_value(getattr(message.forward, 'from_id', None) if message.forward else None),
                         'scraped_at': self._safe_serialize_value(datetime.now().isoformat()),
@@ -205,13 +250,13 @@ class TelegramScraper:
         """
         try:
             today = datetime.now().strftime('%Y-%m-%d')
-            base_path = 'data/raw'
+            base_path = 'data/raw/telegram_messages'
             channel_path = os.path.join(base_path, today, channel_name)
             
             # Create directory structure
             os.makedirs(channel_path, exist_ok=True)
             
-            file_path = os.path.join(channel_path, 'messages.json')
+            file_path = os.path.join(channel_path, f'{channel_name}.json')
             
             # Additional safety check for JSON serialization
             def safe_json_serialize(obj):
@@ -241,6 +286,7 @@ class TelegramScraper:
             Dict[str, Any]: Scraping results summary
         """
         channel_name = self._extract_channel_name(channel_url)
+        start_time = datetime.now()
         
         try:
             logger.info(f"Starting scrape for channel: {channel_name}")
@@ -248,9 +294,14 @@ class TelegramScraper:
             # Get messages
             messages = await self.get_channel_messages(channel_url, limit=1000)
             
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
+            
             if messages:
                 # Save to JSON
                 file_path = self.save_messages_to_json(messages, channel_name)
+                
+                logger.info(f"Completed scraping {channel_name}: {len(messages)} messages in {duration:.2f}s")
                 
                 return {
                     'channel_name': channel_name,
@@ -258,19 +309,30 @@ class TelegramScraper:
                     'message_count': len(messages),
                     'file_path': file_path,
                     'status': 'success',
-                    'error': None
+                    'error': None,
+                    'start_time': start_time.isoformat(),
+                    'end_time': end_time.isoformat(),
+                    'duration_seconds': duration
                 }
             else:
+                logger.warning(f"No messages found for {channel_name}")
+                
                 return {
                     'channel_name': channel_name,
                     'channel_url': channel_url,
                     'message_count': 0,
                     'file_path': None,
                     'status': 'no_messages',
-                    'error': 'No messages found or channel inaccessible'
+                    'error': 'No messages found or channel inaccessible',
+                    'start_time': start_time.isoformat(),
+                    'end_time': end_time.isoformat(),
+                    'duration_seconds': duration
                 }
                 
         except Exception as e:
+            end_time = datetime.now()
+            duration = (end_time - start_time).total_seconds()
+            
             logger.error(f"Failed to scrape {channel_name}: {e}")
             
             # Check if it's a JSON serialization error
@@ -285,7 +347,10 @@ class TelegramScraper:
                 'message_count': 0,
                 'file_path': None,
                 'status': 'error',
-                'error': error_msg
+                'error': error_msg,
+                'start_time': start_time.isoformat(),
+                'end_time': end_time.isoformat(),
+                'duration_seconds': duration
             }
     
     async def scrape_all_channels(self) -> List[Dict[str, Any]]:
@@ -295,6 +360,7 @@ class TelegramScraper:
         Returns:
             List[Dict[str, Any]]: List of scraping results for each channel
         """
+        overall_start_time = datetime.now()
         logger.info(f"Starting scrape for {len(self.target_channels)} channels")
         
         results = []
@@ -305,11 +371,15 @@ class TelegramScraper:
             # Add delay between channels to avoid rate limiting
             await asyncio.sleep(2)
         
+        overall_end_time = datetime.now()
+        overall_duration = (overall_end_time - overall_start_time).total_seconds()
+        
         # Log summary
         successful_scrapes = sum(1 for r in results if r['status'] == 'success')
         total_messages = sum(r['message_count'] for r in results)
         
-        logger.info(f"Scraping completed. {successful_scrapes}/{len(self.target_channels)} channels successful. "
+        logger.info(f"Scraping completed in {overall_duration:.2f}s. "
+                   f"{successful_scrapes}/{len(self.target_channels)} channels successful. "
                    f"Total messages scraped: {total_messages}")
         
         return results
