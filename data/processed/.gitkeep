@@ -1,0 +1,2 @@
+# This file ensures the processed data directory structure is maintained in git
+# Processed data including YOLO results will be stored here 

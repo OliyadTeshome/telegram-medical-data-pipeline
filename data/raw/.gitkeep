@@ -1,0 +1,2 @@
+# This file ensures the data directory structure is maintained in git
+# Raw data will be stored in YYYY-MM-DD/channel_name/messages.json format 

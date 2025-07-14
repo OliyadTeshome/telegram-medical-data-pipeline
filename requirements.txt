@@ -1,0 +1,28 @@
+# Core dependencies
+telethon==1.32.1
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.23
+python-dotenv==1.0.0
+fastapi==0.104.1
+uvicorn==0.24.0
+pydantic==2.5.0
+
+# Data processing
+pandas==2.1.4
+numpy==1.25.2
+dbt-core==1.7.3
+dbt-postgres==1.7.3
+
+# Computer vision
+ultralytics==8.0.196
+opencv-python==4.8.1.78
+pillow==10.1.0
+
+# Orchestration
+dagster==1.5.8
+dagster-postgres==1.5.8
+
+# Utilities
+requests==2.31.0
+aiofiles==23.2.1
+python-multipart==0.0.6 

@@ -1,0 +1,77 @@
+version: 2
+
+sources:
+  - name: raw
+    database: medical_data
+    schema: public
+    tables:
+      - name: raw_messages
+        description: "Raw messages scraped from Telegram channels"
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+          - name: message_id
+            description: "Telegram message ID"
+          - name: chat_id
+            description: "Telegram chat ID"
+          - name: chat_title
+            description: "Channel/chat title"
+          - name: sender_id
+            description: "Message sender ID"
+          - name: sender_username
+            description: "Message sender username"
+          - name: message_text
+            description: "Message text content"
+          - name: message_date
+            description: "Message timestamp"
+          - name: has_media
+            description: "Whether message contains media"
+          - name: media_type
+            description: "Type of media if present"
+          - name: media_path
+            description: "Path to media file if downloaded"
+          - name: created_at
+            description: "Record creation timestamp"
+            
+      - name: enriched_messages
+        description: "Messages enriched with medical analysis"
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+          - name: raw_message_id
+            description: "Reference to raw message"
+            tests:
+              - not_null
+          - name: medical_entities
+            description: "JSON array of medical entities found"
+          - name: sentiment_score
+            description: "Sentiment analysis score (-1 to 1)"
+          - name: urgency_level
+            description: "Urgency level classification"
+          - name: processed_at
+            description: "Processing timestamp"
+            
+      - name: processed_images
+        description: "Image analysis results from YOLO"
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+          - name: message_id
+            description: "Reference to message containing image"
+          - name: image_path
+            description: "Path to processed image"
+          - name: detection_results
+            description: "YOLO detection results"
+          - name: confidence_scores
+            description: "Confidence scores by object class"
+          - name: processed_at
+            description: "Processing timestamp" 
