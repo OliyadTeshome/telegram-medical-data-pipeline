@@ -19,7 +19,7 @@ opencv-python==4.8.1.78
 pillow==10.1.0
 
 # Orchestration
-dagster==1.5.8
+dagster==1.11.2
 dagster-postgres==1.5.8
 
 # Utilities
