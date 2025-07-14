@@ -14,9 +14,7 @@ This pipeline consists of the following components:
 - **Dagster**: Orchestration and workflow management
 - **Docker**: Containerization for easy deployment
 
-## 📁 Project Structure
-
-```
+## 📁 Project Structure```
 telegram-medical-data-pipeline/
 ├── src/
 │   ├── scraper/
@@ -259,13 +257,55 @@ python -m src.enrich.yolo_enricher
 cd dbt && dbt debug
 ```
 
+## 🚀 CI/CD Pipeline
+
+This project includes a comprehensive CI/CD pipeline using GitHub Actions:
+
+### Workflows
+
+- **CI Pipeline** (`ci.yml`): Code quality, testing, and Docker building
+- **Security Scanning** (`security.yml`): Dependency and container security checks
+- **Deployment** (`deploy.yml`): Automated Docker image deployment
+
+### Features
+
+- ✅ **Code Quality**: Black formatting, isort, flake8 linting, mypy type checking
+- ✅ **Testing**: pytest with coverage reporting and PostgreSQL integration
+- ✅ **Security**: Safety dependency scanning, Trivy container scanning, TruffleHog secrets detection
+- ✅ **Deployment**: Automated Docker image building and pushing to GitHub Container Registry
+- ✅ **Dependency Management**: Dependabot for automated dependency updates
+
+### Status Badges
+
+[![CI Pipeline](https://github.com/OliyadTeshome/telegram-medical-data-pipeline/workflows/CI%20Pipeline/badge.svg)](https://github.com/OliyadTeshome/telegram-medical-data-pipeline/actions/workflows/ci.yml)
+[![Security Scanning](https://github.com/OliyadTeshome/telegram-medical-data-pipeline/workflows/Security%20Scanning/badge.svg)](https://github.com/OliyadTeshome/telegram-medical-data-pipeline/actions/workflows/security.yml)
+[![Deploy](https://github.com/OliyadTeshome/telegram-medical-data-pipeline/workflows/Deploy/badge.svg)](https://github.com/OliyadTeshome/telegram-medical-data-pipeline/actions/workflows/deploy.yml)
+
+### Local Development
+
+```bash
+# Run CI checks locally
+black --check .
+isort --check-only .
+flake8 .
+mypy src/
+pytest tests/ -v
+
+# Build and test Docker image
+docker build -t telegram-medical-pipeline .
+docker run --rm telegram-medical-pipeline python -c "import sys; print('OK')"
+```
+
+For detailed CI/CD documentation, see [docs/CI_CD_SETUP.md](docs/CI_CD_SETUP.md).
+
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
 4. Add tests if applicable
-5. Submit a pull request
+5. Run local CI checks before submitting
+6. Submit a pull request
 
 ## 📄 License
 
@@ -278,3 +318,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [dbt](https://docs.getdbt.com/) for data transformation
 - [Dagster](https://docs.dagster.io/) for orchestration
 - [FastAPI](https://fastapi.tiangolo.com/) for API development 
+

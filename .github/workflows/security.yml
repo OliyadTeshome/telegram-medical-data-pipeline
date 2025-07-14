@@ -1,0 +1,78 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 2 * * 1'  # Weekly security scan
+
+jobs:
+  dependency-scan:
+    name: Dependency Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.11'
+        
+    - name: Install safety
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety
+        
+    - name: Run safety check
+      run: |
+        safety check -r requirements.txt --json --output safety-report.json
+        
+    - name: Upload safety report
+      uses: actions/upload-artifact@v3
+      with:
+        name: safety-report
+        path: safety-report.json
+
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Build Docker image
+      run: |
+        docker build -t telegram-medical-pipeline:security-scan .
+        
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'telegram-medical-pipeline:security-scan'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  secrets-scan:
+    name: Secrets Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Run TruffleHog
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: .
+        base: HEAD~1
+        head: HEAD 
