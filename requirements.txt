@@ -16,7 +16,7 @@ dbt-postgres==1.7.3
 # Computer vision
 ultralytics==8.0.196
 opencv-python==4.8.1.78
-pillow==10.1.0
+pillow==11.3.0
 
 # Orchestration
 dagster==1.5.8
