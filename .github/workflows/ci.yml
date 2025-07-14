@@ -118,7 +118,7 @@ jobs:
         docker run --rm telegram-medical-pipeline:latest python -c "import sys; print('Python version:', sys.version)"
         
     - name: Save Docker image
-      uses: actions/cache/save@v3
+      uses: actions/cache/save@v4
       with:
         path: /tmp/docker-images
         key: docker-images-${{ github.sha }} 
