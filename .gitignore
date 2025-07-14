@@ -189,6 +189,7 @@ data/processed/*/
 data/models/*/
 data/cache/*/
 data/logs/*/
+notebooks/data/
 
 # Keep directory structure but ignore content
 !data/raw/.gitkeep
@@ -365,3 +366,5 @@ datasets/
 !data/raw/sample.json
 !data/processed/sample.csv
 !tests/data/sample.json 
+
+

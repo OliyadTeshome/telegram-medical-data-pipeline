@@ -64,6 +64,46 @@ telegram-medical-data-pipeline/
 - Python 3.11+
 - Telegram API credentials (API ID, API Hash, Phone Number)
 
+### Telegram Scraper Setup
+
+The pipeline includes an enhanced asynchronous Telegram scraper with the following features:
+
+- **Asynchronous Design**: Uses Telethon for efficient message scraping
+- **Rate Limiting**: Automatic handling of Telegram's rate limits
+- **Error Handling**: Comprehensive error handling for various Telegram errors
+- **Logging**: Detailed logging with progress tracking
+- **Modular Design**: Ready for scheduling and integration
+
+#### Target Channels
+The scraper is configured to scrape these medical channels:
+- `https://t.me/CheMed123`
+- `https://t.me/lobelia4cosmetics`
+- `https://t.me/tikvahpharma`
+
+#### Running the Scraper
+
+```bash
+# Run the scraper independently
+python scripts/run_scraper.py
+
+# Test the scraper
+python scripts/test_scraper.py
+```
+
+#### Output Structure
+```
+data/raw/
+└── YYYY-MM-DD/
+    ├── CheMed123/
+    │   └── messages.json
+    ├── lobelia4cosmetics/
+    │   └── messages.json
+    └── tikvahpharma/
+        └── messages.json
+```
+
+For detailed setup instructions, see [docs/TELEGRAM_SCRAPER_SETUP.md](docs/TELEGRAM_SCRAPER_SETUP.md).
+
 ### 1. Environment Setup
 
 Copy the environment example and configure your settings:
