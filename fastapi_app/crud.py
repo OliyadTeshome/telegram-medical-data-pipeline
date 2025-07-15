@@ -8,19 +8,42 @@ from . import models, schemas
 
 # Channel operations
 def get_channels(db: Session, skip: int = 0, limit: int = 100):
-    """Get all channels"""
-    return db.query(models.DimChannels).offset(skip).limit(limit).all()
+    """Get all channels from fct_messages"""
+    # Get unique channels from fct_messages since dim_channels might not be synced
+    channels_query = db.query(
+        models.FctMessages.chat_title,
+        func.count(models.FctMessages.message_id).label('message_count')
+    ).group_by(
+        models.FctMessages.chat_title
+    ).order_by(
+        desc('message_count')
+    ).offset(skip).limit(limit)
+    
+    return [
+        {
+            "channel_name": row.chat_title,
+            "message_count": row.message_count
+        }
+        for row in channels_query.all()
+    ]
 
 def get_channel_by_name(db: Session, channel_name: str):
-    """Get channel by name"""
-    return db.query(models.DimChannels).filter(models.DimChannels.channel_name == channel_name).first()
+    """Get channel by name from fct_messages"""
+    # Check if channel exists in fct_messages
+    channel_exists = db.query(models.FctMessages).filter(
+        models.FctMessages.chat_title == channel_name
+    ).first()
+    
+    if channel_exists:
+        return {"channel_name": channel_name, "exists": True}
+    return None
 
 # Message operations
 def get_messages(db: Session, skip: int = 0, limit: int = 100, channel_name: Optional[str] = None):
     """Get messages with optional channel filter"""
     query = db.query(models.FctMessages)
     if channel_name:
-        query = query.filter(models.FctMessages.channel_name == channel_name)
+        query = query.filter(models.FctMessages.chat_title == channel_name)
     return query.offset(skip).limit(limit).all()
 
 def get_message_by_id(db: Session, message_id: int):
@@ -56,7 +79,6 @@ def get_top_products(db: Session, limit: int = 10):
            OR message_text ILIKE '%tablet%'
            OR message_text ILIKE '%syrup%'
            OR message_text ILIKE '%injection%'
-        GROUP BY 'Medical Product'
         
         UNION ALL
         
@@ -70,7 +92,6 @@ def get_top_products(db: Session, limit: int = 10):
            OR message_text ILIKE '%ibuprofen%'
            OR message_text ILIKE '%aspirin%'
            OR message_text ILIKE '%pain%'
-        GROUP BY 'Pain Relief'
         
         UNION ALL
         
@@ -83,7 +104,6 @@ def get_top_products(db: Session, limit: int = 10):
         WHERE message_text ILIKE '%antibiotic%' 
            OR message_text ILIKE '%amoxicillin%'
            OR message_text ILIKE '%penicillin%'
-        GROUP BY 'Antibiotics'
     )
     SELECT 
         product_name,
@@ -109,39 +129,65 @@ def get_top_products(db: Session, limit: int = 10):
 
 def get_channel_activity(db: Session, channel_name: str, period: str = "daily", limit: int = 30):
     """Get channel activity by period (daily/weekly/monthly)"""
-    if period == "daily":
-        date_format = "%Y-%m-%d"
-        group_by = func.date(models.FctMessages.message_date)
-    elif period == "weekly":
-        date_format = "%Y-W%U"
-        group_by = func.date_trunc('week', models.FctMessages.message_date)
-    else:  # monthly
-        date_format = "%Y-%m"
-        group_by = func.date_trunc('month', models.FctMessages.message_date)
-    
-    query = db.query(
-        group_by.label('date'),
-        func.count(models.FctMessages.message_id).label('message_count'),
-        func.count(models.FctMessages.message_id).label('medical_content_count'),  # Using message_id as fallback
-        func.avg(func.cast(0, func.Float)).label('average_sentiment')  # Default sentiment
-    ).filter(
-        models.FctMessages.chat_title == channel_name
-    ).group_by(
-        group_by
-    ).order_by(
-        desc('date')
-    ).limit(limit)
-    
-    return [
-        {
-            "channel_name": channel_name,
-            "date": row.date.strftime(date_format) if row.date else None,
-            "message_count": row.message_count,
-            "medical_content_count": row.medical_content_count,
-            "average_sentiment": float(row.average_sentiment) if row.average_sentiment else 0.0
-        }
-        for row in query.all()
-    ]
+    try:
+        if period == "daily":
+            date_format = "%Y-%m-%d"
+            # Use text() for date functions to avoid SQLAlchemy compatibility issues
+            from sqlalchemy import text
+            query = db.execute(text("""
+                SELECT 
+                    DATE(message_date) as date,
+                    COUNT(*) as message_count,
+                    COUNT(*) as medical_content_count,
+                    0.0 as average_sentiment
+                FROM fct_messages 
+                WHERE chat_title = :channel_name
+                GROUP BY DATE(message_date)
+                ORDER BY date DESC
+                LIMIT :limit
+            """), {"channel_name": channel_name, "limit": limit})
+        elif period == "weekly":
+            date_format = "%Y-W%U"
+            query = db.execute(text("""
+                SELECT 
+                    DATE_TRUNC('week', message_date) as date,
+                    COUNT(*) as message_count,
+                    COUNT(*) as medical_content_count,
+                    0.0 as average_sentiment
+                FROM fct_messages 
+                WHERE chat_title = :channel_name
+                GROUP BY DATE_TRUNC('week', message_date)
+                ORDER BY date DESC
+                LIMIT :limit
+            """), {"channel_name": channel_name, "limit": limit})
+        else:  # monthly
+            date_format = "%Y-%m"
+            query = db.execute(text("""
+                SELECT 
+                    DATE_TRUNC('month', message_date) as date,
+                    COUNT(*) as message_count,
+                    COUNT(*) as medical_content_count,
+                    0.0 as average_sentiment
+                FROM fct_messages 
+                WHERE chat_title = :channel_name
+                GROUP BY DATE_TRUNC('month', message_date)
+                ORDER BY date DESC
+                LIMIT :limit
+            """), {"channel_name": channel_name, "limit": limit})
+        
+        return [
+            {
+                "channel_name": channel_name,
+                "date": row.date.strftime(date_format) if row.date else None,
+                "message_count": row.message_count,
+                "medical_content_count": row.medical_content_count,
+                "average_sentiment": float(row.average_sentiment) if row.average_sentiment else 0.0
+            }
+            for row in query
+        ]
+    except Exception as e:
+        print(f"Error in get_channel_activity: {str(e)}")
+        return []
 
 def search_messages(db: Session, query: str, limit: int = 50):
     """Full-text search across messages"""
@@ -197,8 +243,8 @@ def get_statistics(db: Session):
     # Total messages
     total_messages = db.query(func.count(models.FctMessages.message_id)).scalar()
     
-    # Total channels
-    total_channels = db.query(func.count(models.DimChannels.channel_id)).scalar()
+    # Total channels (from fct_messages)
+    total_channels = db.query(func.count(func.distinct(models.FctMessages.chat_title))).scalar()
     
     # Total medical insights (using fct_messages as fallback)
     total_medical_insights = db.query(func.count(models.FctMessages.message_id)).scalar()

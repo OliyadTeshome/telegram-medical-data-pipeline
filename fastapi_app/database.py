@@ -10,7 +10,7 @@ load_dotenv()
 # Database configuration
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://postgres:password@localhost:5432/telegram_medical_data"
+    "postgresql://postgres:pa55w0rd@localhost:5432/medical_data"
 )
 
 # Create SQLAlchemy engine
