@@ -87,7 +87,7 @@ telegram-medical-data-pipeline/
 
 1. **Clone the repository**
 ```bash
-git clone <repository-url>
+git clone (https://github.com/OliyadTeshome/telegram-medical-data-pipeline.git)
 cd telegram-medical-data-pipeline
 ```
 
