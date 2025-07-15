@@ -14,46 +14,65 @@ This pipeline consists of the following components:
 - **Dagster**: Orchestration and workflow management
 - **Docker**: Containerization for easy deployment
 
-## 📁 Project Structure```
+## 📁 Project Structure
+
+```
 telegram-medical-data-pipeline/
 ├── src/
 │   ├── scraper/
 │   │   ├── __init__.py
-│   │   └── telegram_scraper.py
+│   │   └── telegram_scraper.py          # Async Telegram scraper with media download
 │   ├── loader/
 │   │   ├── __init__.py
-│   │   └── postgres_loader.py
+│   │   └── postgres_loader.py           # PostgreSQL data loader
 │   ├── enrich/
 │   │   ├── __init__.py
-│   │   └── yolo_enricher.py
+│   │   └── yolo_enricher.py            # YOLOv8 image analysis
 │   ├── dbt_runner/
 │   │   ├── __init__.py
-│   │   └── dbt_executor.py
+│   │   └── dbt_executor.py             # dbt execution utilities
 │   └── utils/
 │       ├── __init__.py
-│       └── config.py
-├── data/
-│   ├── raw/YYYY-MM-DD/channel_name/messages.json
-│   └── processed/
+│       └── config.py                   # Configuration management
 ├── dbt/
-│   ├── dbt_project.yml
-│   ├── profiles.yml
-│   ├── models/
-│   │   ├── staging/
-│   │   └── marts/
-│   └── sources.yml
+│   ├── dbt_project.yml                 # dbt project configuration
+│   ├── profiles.yml                    # Database connection profiles
+│   ├── models/                         # Data transformation models
+│   ├── macros/                         # Reusable SQL macros
+│   ├── tests/                          # Data quality tests
+│   ├── create_models.sql              # Database schema creation
+│   ├── run_models.py                  # dbt execution script
+│   └── README.md                      # dbt documentation
 ├── fastapi_app/
 │   ├── __init__.py
-│   └── main.py
+│   └── main.py                        # FastAPI application with endpoints
 ├── dags/
 │   ├── __init__.py
-│   └── telegram_pipeline.py
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-├── env.example
-├── init.sql
-└── README.md
+│   └── telegram_pipeline.py           # Dagster orchestration pipeline
+├── scripts/
+│   ├── run_scraper.py                 # Standalone scraper execution
+│   ├── test_scraper.py                # Scraper testing script
+│   ├── load_telegram_messages.py      # Data loading utilities
+│   ├── test_db_connection.py          # Database connection testing
+│   └── README_telegram_loader.md      # Loader documentation
+├── notebooks/
+│   ├── scraping.ipynb                 # Jupyter notebook for scraping
+│   ├── transform.ipynb                # Data transformation notebook
+│   ├── model.ipynb                    # Model development notebook
+│   └── data/                          # Notebook data files
+├── docs/
+│   ├── TELEGRAM_SCRAPER_SETUP.md      # Detailed scraper setup guide
+│   └── CI_CD_SETUP.md                 # CI/CD pipeline documentation
+├── tests/
+│   ├── __init__.py
+│   ├── test_scraper.py                # Scraper unit tests
+│   └── test_loader.py                 # Loader unit tests
+├── Dockerfile                         # Docker container definition
+├── docker-compose.yml                 # Multi-service orchestration
+├── requirements.txt                   # Python dependencies
+├── pyproject.toml                     # Project metadata and tooling config
+├── init.sql                          # Database initialization script
+└── README.md                         # This file
 ```
 
 ## 🚀 Quick Start
@@ -64,83 +83,25 @@ telegram-medical-data-pipeline/
 - Python 3.11+
 - Telegram API credentials (API ID, API Hash, Phone Number)
 
-### Telegram Scraper Setup
+### Environment Setup
 
-The pipeline includes an enhanced asynchronous Telegram scraper with the following features:
-
-- **Asynchronous Design**: Uses Telethon for efficient message scraping
-- **Rate Limiting**: Automatic handling of Telegram's rate limits
-- **Error Handling**: Comprehensive error handling for various Telegram errors
-- **Logging**: Detailed logging with progress tracking
-- **Modular Design**: Ready for scheduling and integration
-
-#### Target Channels
-The scraper is configured to scrape these medical channels:
-- `https://t.me/CheMed123`
-- `https://t.me/lobelia4cosmetics`
-- `https://t.me/tikvahpharma`
-
-#### Running the Scraper
-
+1. **Clone the repository**
 ```bash
-# Run the scraper independently
-python scripts/run_scraper.py
-
-# Test the scraper
-python scripts/test_scraper.py
+git clone <repository-url>
+cd telegram-medical-data-pipeline
 ```
 
-#### Output Structure
-```
-data/raw/
-└── YYYY-MM-DD/
-    ├── CheMed123/
-    │   └── messages.json
-    ├── lobelia4cosmetics/
-    │   └── messages.json
-    └── tikvahpharma/
-        └── messages.json
-```
-
-For detailed setup instructions, see [docs/TELEGRAM_SCRAPER_SETUP.md](docs/TELEGRAM_SCRAPER_SETUP.md).
-
-### 1. Environment Setup
-
-Copy the environment example and configure your settings:
-
+2. **Set up environment variables**
 ```bash
+# Copy environment template
 cp env.example .env
-```
 
-Edit `.env` with your actual credentials:
-
-```env
-# Telegram API Configuration
+# Edit .env with your credentials
 TELEGRAM_API_ID=your_api_id_here
 TELEGRAM_API_HASH=your_api_hash_here
 TELEGRAM_PHONE=your_phone_number_here
-
-# PostgreSQL Configuration
 POSTGRES_PASSWORD=your_secure_password_here
 ```
-
-### 2. Start the Pipeline
-
-```bash
-# Build and start all services
-docker-compose up --build
-
-# Or run in background
-docker-compose up -d --build
-```
-
-### 3. Access Services
-
-- **FastAPI**: http://localhost:8000
-- **Dagster UI**: http://localhost:3000
-- **PostgreSQL**: localhost:5432
-
-## 🔧 Configuration
 
 ### Telegram API Setup
 
@@ -149,7 +110,56 @@ docker-compose up -d --build
 3. Create a new application
 4. Copy the API ID and API Hash to your `.env` file
 
-### Channel Configuration
+### Running the Pipeline
+
+#### Option 1: Docker Compose (Recommended)
+```bash
+# Build and start all services
+docker-compose up --build
+
+# Or run in background
+docker-compose up -d --build
+```
+
+#### Option 2: Individual Components
+
+**Test the scraper:**
+```bash
+python scripts/test_scraper.py
+```
+
+**Run the scraper:**
+```bash
+python scripts/run_scraper.py
+```
+
+**Test database connection:**
+```bash
+python scripts/test_db_connection.py
+```
+
+**Run dbt transformations:**
+```bash
+cd dbt
+python run_models.py
+```
+
+### Access Services
+
+- **FastAPI**: http://localhost:8000
+- **Dagster UI**: http://localhost:3000
+- **PostgreSQL**: localhost:5432
+
+## 🔧 Configuration
+
+### Target Channels
+
+The scraper is configured to scrape these medical channels:
+- `https://t.me/CheMed123`
+- `https://t.me/lobelia4cosmetics`
+- `https://t.me/tikvahpharma`
+
+### Pipeline Configuration
 
 Edit the pipeline configuration in `dags/telegram_pipeline.py`:
 
@@ -159,8 +169,8 @@ def get_pipeline_config():
         "ops": {
             "scrape_telegram_messages": {
                 "config": {
-                    "channels": ["@your_medical_channel", "@health_news"],
-                    "limit": 100
+                    "channels": ["@CheMed123", "@lobelia4cosmetics", "@tikvahpharma"],
+                    "limit": 1000
                 }
             }
         }
@@ -169,7 +179,7 @@ def get_pipeline_config():
 
 ## 📊 Data Flow
 
-1. **Extraction**: Telegram messages are scraped from configured channels
+1. **Extraction**: Telegram messages are scraped from configured channels using async Telethon
 2. **Storage**: Raw data is stored in PostgreSQL with date-based organization
 3. **Enrichment**: 
    - Text messages are analyzed for medical entities and sentiment
@@ -202,9 +212,9 @@ GET /images/analysis?limit=100&offset=0
 
 The Dagster pipeline orchestrates the entire data flow:
 
-1. **Scrape Messages**: Extract from Telegram channels
-2. **Load to PostgreSQL**: Store raw data
-3. **Process Images**: YOLO analysis for medical content
+1. **Scrape Messages**: Extract from Telegram channels using async Telethon
+2. **Load to PostgreSQL**: Store raw data with proper error handling
+3. **Process Images**: YOLO analysis for medical content detection
 4. **Enrich Messages**: Medical entity extraction and sentiment analysis
 5. **Run dbt**: Transform data into analytics models
 6. **Generate Report**: Pipeline execution summary
@@ -212,9 +222,9 @@ The Dagster pipeline orchestrates the entire data flow:
 ## 📈 Data Models
 
 ### Raw Tables
-- `raw_messages`: Scraped Telegram messages
-- `processed_images`: YOLO analysis results
-- `enriched_messages`: Medical analysis and sentiment
+- `raw_messages`: Scraped Telegram messages with metadata
+- `processed_images`: YOLO analysis results with confidence scores
+- `enriched_messages`: Medical analysis and sentiment data
 
 ### Analytics Models
 - `fct_medical_insights`: Fact table with medical insights
@@ -287,14 +297,35 @@ python -m fastapi_app.main
 ### Testing
 
 ```bash
-# Test database connection
-python -m src.loader.postgres_loader
+# Test scraper functionality
+python scripts/test_scraper.py
 
-# Test YOLO enrichment
-python -m src.enrich.yolo_enricher
+# Test database connection
+python scripts/test_db_connection.py
 
 # Test dbt configuration
 cd dbt && dbt debug
+
+# Run unit tests
+pytest tests/ -v
+```
+
+### Code Quality
+
+The project includes comprehensive code quality tools:
+
+```bash
+# Format code
+black src/ fastapi_app/ dags/ scripts/
+
+# Sort imports
+isort src/ fastapi_app/ dags/ scripts/
+
+# Lint code
+flake8 src/ fastapi_app/ dags/ scripts/
+
+# Type checking
+mypy src/ fastapi_app/ dags/ scripts/
 ```
 
 ## 🚀 CI/CD Pipeline
@@ -303,9 +334,9 @@ This project includes a comprehensive CI/CD pipeline using GitHub Actions:
 
 ### Workflows
 
-- **CI Pipeline** (`ci.yml`): Code quality, testing, and Docker building
-- **Security Scanning** (`security.yml`): Dependency and container security checks
-- **Deployment** (`deploy.yml`): Automated Docker image deployment
+- **CI Pipeline**: Code quality, testing, and Docker building
+- **Security Scanning**: Dependency and container security checks
+- **Deployment**: Automated Docker image deployment
 
 ### Features
 
@@ -315,28 +346,13 @@ This project includes a comprehensive CI/CD pipeline using GitHub Actions:
 - ✅ **Deployment**: Automated Docker image building and pushing to GitHub Container Registry
 - ✅ **Dependency Management**: Dependabot for automated dependency updates
 
-### Status Badges
-
-[![CI Pipeline](https://github.com/OliyadTeshome/telegram-medical-data-pipeline/workflows/CI%20Pipeline/badge.svg)](https://github.com/OliyadTeshome/telegram-medical-data-pipeline/actions/workflows/ci.yml)
-[![Security Scanning](https://github.com/OliyadTeshome/telegram-medical-data-pipeline/workflows/Security%20Scanning/badge.svg)](https://github.com/OliyadTeshome/telegram-medical-data-pipeline/actions/workflows/security.yml)
-[![Deploy](https://github.com/OliyadTeshome/telegram-medical-data-pipeline/workflows/Deploy/badge.svg)](https://github.com/OliyadTeshome/telegram-medical-data-pipeline/actions/workflows/deploy.yml)
-
-### Local Development
-
-```bash
-# Run CI checks locally
-black --check .
-isort --check-only .
-flake8 .
-mypy src/
-pytest tests/ -v
-
-# Build and test Docker image
-docker build -t telegram-medical-pipeline .
-docker run --rm telegram-medical-pipeline python -c "import sys; print('OK')"
-```
-
 For detailed CI/CD documentation, see [docs/CI_CD_SETUP.md](docs/CI_CD_SETUP.md).
+
+## 📚 Documentation
+
+- [Telegram Scraper Setup](docs/TELEGRAM_SCRAPER_SETUP.md) - Detailed setup guide for the Telegram scraper
+- [CI/CD Setup](docs/CI_CD_SETUP.md) - Complete CI/CD pipeline documentation
+- [dbt Documentation](dbt/README.md) - Data transformation and modeling guide
 
 ## 🤝 Contributing
 
