@@ -1,4 +1,4 @@
-telegram_medical_pipeline:
+telegram_dbt:
   target: dev
   outputs:
     dev:
@@ -7,7 +7,7 @@ telegram_medical_pipeline:
       port: "{{ env_var('POSTGRES_PORT', '5432') }}"
       user: "{{ env_var('POSTGRES_USER', 'postgres') }}"
       pass: "{{ env_var('POSTGRES_PASSWORD', '') }}"
-      dbname: "{{ env_var('POSTGRES_DB', 'medical_data') }}"
+      dbname: "{{ env_var('POSTGRES_DB', 'telegram_medical') }}"
       schema: public
       threads: 4
       keepalives_idle: 0
