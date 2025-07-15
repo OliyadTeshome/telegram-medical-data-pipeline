@@ -1,8 +1,8 @@
-name: 'telegram_medical_pipeline'
+name: 'telegram_dbt'
 version: '1.0.0'
 config-version: 2
 
-profile: 'telegram_medical_pipeline'
+profile: 'telegram_dbt'
 
 model-paths: ["models"]
 analysis-paths: ["analyses"]
@@ -17,7 +17,7 @@ clean-targets:
   - "dbt_packages"
 
 models:
-  telegram_medical_pipeline:
+  telegram_dbt:
     staging:
       +materialized: view
     marts:
@@ -26,6 +26,6 @@ models:
       +materialized: view
 
 vars:
-  raw_schema: public
+  raw_schema: raw
   staging_schema: staging
   marts_schema: marts 
