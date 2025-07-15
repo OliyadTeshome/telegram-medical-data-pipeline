@@ -5,8 +5,7 @@ from datetime import datetime
 # Base schemas
 class ChannelBase(BaseModel):
     channel_name: str
-    chat_id: int
-    chat_title: str
+    message_count: int
 
 class MessageBase(BaseModel):
     message_text: str
@@ -26,10 +25,6 @@ class MedicalInsightBase(BaseModel):
 
 # Response schemas
 class ChannelResponse(ChannelBase):
-    channel_id: int
-    created_at: datetime
-    updated_at: datetime
-    
     class Config:
         orm_mode = True
 
@@ -101,7 +96,7 @@ class TopProductsRequest(BaseModel):
     limit: int = Field(default=10, ge=1, le=100, description="Number of top products to return")
 
 class ChannelActivityRequest(BaseModel):
-    period: str = Field(default="daily", regex="^(daily|weekly|monthly)$", description="Activity period")
+    period: str = Field(default="daily", pattern="^(daily|weekly|monthly)$", description="Activity period")
     limit: int = Field(default=30, ge=1, le=365, description="Number of periods to return")
 
 # Statistics schemas

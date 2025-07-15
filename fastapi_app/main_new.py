@@ -1,15 +1,34 @@
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Optional
 import os
 from dotenv import load_dotenv
+import logging
 
-from .database import get_db
+from .database import get_db, engine
 from . import crud, schemas, models
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
+
+# Test database connection on startup
+def test_database_connection():
+    """Test database connection on startup"""
+    try:
+        with engine.connect() as connection:
+            result = connection.execute(text("SELECT 1"))
+            logger.info("✓ Database connection successful")
+            return True
+    except Exception as e:
+        logger.error(f"✗ Database connection failed: {str(e)}")
+        return False
 
 # Create FastAPI app
 app = FastAPI(
@@ -29,6 +48,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Test database connection on startup"""
+    if not test_database_connection():
+        logger.error("Failed to connect to database. Please check your database configuration.")
+        # Don't exit, but log the error
+
 @app.get("/")
 async def root():
     """Root endpoint"""
@@ -36,14 +62,17 @@ async def root():
         "message": "Telegram Medical Data Analytics API",
         "version": "2.0.0",
         "status": "running",
-        "docs": "/docs"
+        "docs": "/docs",
+        "database_status": "connected" if test_database_connection() else "disconnected"
     }
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
+    db_status = "connected" if test_database_connection() else "disconnected"
     return {
-        "status": "healthy",
+        "status": "healthy" if db_status == "connected" else "unhealthy",
+        "database": db_status,
         "timestamp": "2024-01-01T00:00:00Z"
     }
 
@@ -64,12 +93,13 @@ async def get_top_products(
         products = crud.get_top_products(db, limit=limit)
         return products
     except Exception as e:
+        logger.error(f"Error in get_top_products: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving top products: {str(e)}")
 
 @app.get("/api/channels/{channel_name}/activity", response_model=List[schemas.ChannelActivityResponse])
 async def get_channel_activity(
     channel_name: str,
-    period: str = Query(default="daily", regex="^(daily|weekly|monthly)$", description="Activity period"),
+    period: str = Query(default="daily", pattern="^(daily|weekly|monthly)$", description="Activity period"),
     limit: int = Query(default=30, ge=1, le=365, description="Number of periods to return"),
     db: Session = Depends(get_db)
 ):
@@ -90,6 +120,7 @@ async def get_channel_activity(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error in get_channel_activity: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving channel activity: {str(e)}")
 
 @app.get("/api/search/messages", response_model=schemas.SearchResponse)
@@ -113,6 +144,7 @@ async def search_messages(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error in search_messages: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error searching messages: {str(e)}")
 
 # Additional Analytics Endpoints
@@ -129,6 +161,7 @@ async def get_statistics(db: Session = Depends(get_db)):
         stats = crud.get_statistics(db)
         return stats
     except Exception as e:
+        logger.error(f"Error in get_statistics: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving statistics: {str(e)}")
 
 @app.get("/api/channels", response_model=List[schemas.ChannelResponse])
@@ -144,6 +177,7 @@ async def get_channels(
         channels = crud.get_channels(db, skip=skip, limit=limit)
         return channels
     except Exception as e:
+        logger.error(f"Error in get_channels: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving channels: {str(e)}")
 
 @app.get("/api/messages", response_model=List[schemas.MessageResponse])
@@ -160,6 +194,7 @@ async def get_messages(
         messages = crud.get_messages(db, skip=skip, limit=limit, channel_name=channel_name)
         return messages
     except Exception as e:
+        logger.error(f"Error in get_messages: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving messages: {str(e)}")
 
 @app.get("/api/medical-insights", response_model=List[schemas.MedicalInsightResponse])
@@ -179,6 +214,7 @@ async def get_medical_insights(
             insights = crud.get_medical_insights(db, skip, limit)
         return insights
     except Exception as e:
+        logger.error(f"Error in get_medical_insights: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving medical insights: {str(e)}")
 
 @app.get("/api/messages/{message_id}", response_model=schemas.MessageResponse)
@@ -194,28 +230,24 @@ async def get_message_by_id(message_id: int, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error in get_message_by_id: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error retrieving message: {str(e)}")
 
 # Error handlers
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
-    return {"error": "Resource not found", "detail": str(exc)}
+    return JSONResponse(
+        status_code=404,
+        content={"detail": "Resource not found", "path": str(request.url)}
+    )
 
 @app.exception_handler(500)
 async def internal_error_handler(request, exc):
-    return {"error": "Internal server error", "detail": str(exc)}
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "path": str(request.url)}
+    )
 
 if __name__ == "__main__":
     import uvicorn
-    
-    # Get configuration from environment variables
-    host = os.getenv("FASTAPI_HOST", "0.0.0.0")
-    port = int(os.getenv("FASTAPI_PORT", "8000"))
-    reload = os.getenv("FASTAPI_RELOAD", "true").lower() == "true"
-    
-    uvicorn.run(
-        "fastapi_app.main_new:app",
-        host=host,
-        port=port,
-        reload=reload
-    ) 
+    uvicorn.run(app, host="0.0.0.0", port=8000) 
