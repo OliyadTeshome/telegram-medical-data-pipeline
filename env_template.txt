@@ -1,0 +1,13 @@
+# Telegram API Configuration
+# Get these from https://my.telegram.org/auth
+TELEGRAM_API_ID=your_api_id_here
+TELEGRAM_API_HASH=your_api_hash_here
+TELEGRAM_PHONE=your_phone_number_here
+TELEGRAM_SESSION_NAME=medical_pipeline_session
+
+# Database Configuration
+DATABASE_URL=postgresql://postgres:password@localhost:5432/medical_data
+
+# dbt Configuration
+DBT_PROJECT_DIR=./dbt
+DBT_PROFILES_DIR=./dbt 

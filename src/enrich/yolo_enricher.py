@@ -1,183 +1,222 @@
 import os
 import cv2
-import json
-import numpy as np
-from typing import List, Dict, Any, Tuple
+import torch
+import logging
+from typing import List, Dict, Any, Optional
 from ultralytics import YOLO
-from PIL import Image
-from dotenv import load_dotenv
+import json
+from datetime import datetime
 
-load_dotenv()
+logger = logging.getLogger(__name__)
 
 class YOLOEnricher:
-    def __init__(self):
-        self.model_path = os.getenv('YOLO_MODEL_PATH', 'yolov8n.pt')
-        self.confidence_threshold = float(os.getenv('CONFIDENCE_THRESHOLD', 0.5))
-        self.model = None
-        self.medical_classes = [
-            'person', 'bottle', 'cup', 'bowl', 'knife', 'spoon', 'fork',
-            'cell phone', 'laptop', 'mouse', 'remote', 'keyboard', 'book',
-            'clock', 'vase', 'scissors', 'teddy bear', 'hair drier', 'toothbrush'
-        ]
+    """
+    YOLO-based image enrichment for medical content detection.
+    Processes images downloaded from Telegram messages.
+    """
+    
+    def __init__(self, model_path: Optional[str] = None, confidence_threshold: float = 0.5):
+        """
+        Initialize YOLO enricher
         
-    def load_model(self):
-        """Load YOLO model"""
+        Args:
+            model_path: Path to YOLO model file
+            confidence_threshold: Minimum confidence for detections
+        """
+        self.confidence_threshold = confidence_threshold
+        self.model = None
+        
+        # Set default model path if not provided
+        if not model_path:
+            model_path = os.getenv('YOLO_MODEL_PATH', 'yolov8n.pt')
+        
+        self.model_path = model_path
+        self._load_model()
+    
+    def _load_model(self):
+        """Load YOLO model with safe globals"""
         try:
+            logger.info(f"Loading YOLO model from: {self.model_path}")
+            
+            # Add safe globals for ultralytics models
+            import torch.serialization
+            torch.serialization.add_safe_globals(['ultralytics.nn.tasks.DetectionModel'])
+            
+            # Load model with weights_only=False for compatibility
             self.model = YOLO(self.model_path)
-            print(f"Loaded YOLO model from {self.model_path}")
+            
+            logger.info("✅ YOLO model loaded successfully")
+            
         except Exception as e:
-            print(f"Error loading YOLO model: {e}")
-            raise
+            logger.error(f"Error loading YOLO model: {e}")
+            # Try alternative loading method
+            try:
+                logger.info("Trying alternative model loading method...")
+                self.model = YOLO('yolov8n.pt')  # Use default model
+                logger.info("✅ YOLO model loaded with default weights")
+            except Exception as e2:
+                logger.error(f"Failed to load YOLO model: {e2}")
+                self.model = None
+    
+    def process_image(self, image_path: str) -> Dict[str, Any]:
+        """
+        Process a single image with YOLO
+        
+        Args:
+            image_path: Path to the image file
             
-    def detect_objects(self, image_path: str) -> Dict[str, Any]:
-        """Detect objects in an image using YOLO"""
+        Returns:
+            Dict containing detection results
+        """
         if not self.model:
-            self.load_model()
-            
+            return {
+                'status': 'failed',
+                'error': 'YOLO model not loaded',
+                'detections': []
+            }
+        
         try:
-            # Load and process image
+            # Check if image exists
+            if not os.path.exists(image_path):
+                return {
+                    'status': 'failed',
+                    'error': f'Image file not found: {image_path}',
+                    'detections': []
+                }
+            
+            # Run inference
             results = self.model(image_path, conf=self.confidence_threshold)
             
             detections = []
-            confidence_scores = {}
-            
             for result in results:
-                boxes = result.boxes
-                if boxes is not None:
-                    for box in boxes:
-                        # Get box coordinates
-                        x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                        
-                        # Get confidence and class
-                        confidence = float(box.conf[0].cpu().numpy())
-                        class_id = int(box.cls[0].cpu().numpy())
-                        class_name = self.model.names[class_id]
-                        
+                if result.boxes is not None:
+                    for box in result.boxes:
                         detection = {
-                            'bbox': [float(x1), float(y1), float(x2), float(y2)],
-                            'confidence': confidence,
-                            'class_id': class_id,
-                            'class_name': class_name
+                            'class': result.names[int(box.cls[0])],
+                            'confidence': float(box.conf[0]),
+                            'bbox': box.xyxy[0].tolist(),
+                            'image_path': image_path
                         }
                         detections.append(detection)
-                        
-                        # Track confidence scores by class
-                        if class_name not in confidence_scores:
-                            confidence_scores[class_name] = []
-                        confidence_scores[class_name].append(confidence)
-            
-            # Calculate average confidence for each class
-            avg_confidence = {}
-            for class_name, scores in confidence_scores.items():
-                avg_confidence[class_name] = sum(scores) / len(scores)
             
             return {
+                'status': 'success',
                 'detections': detections,
-                'confidence_scores': avg_confidence,
-                'total_detections': len(detections),
-                'image_path': image_path
+                'total_detections': len(detections)
             }
             
         except Exception as e:
-            print(f"Error detecting objects in {image_path}: {e}")
+            logger.error(f"Error processing image {image_path}: {e}")
             return {
-                'detections': [],
-                'confidence_scores': {},
-                'total_detections': 0,
-                'image_path': image_path,
-                'error': str(e)
+                'status': 'failed',
+                'error': str(e),
+                'detections': []
             }
     
-    def analyze_medical_relevance(self, detections: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Analyze medical relevance of detected objects"""
-        medical_keywords = {
-            'person': 1.0,
-            'bottle': 0.8,
-            'cup': 0.6,
-            'bowl': 0.5,
-            'knife': 0.9,
-            'spoon': 0.7,
-            'fork': 0.7,
-            'cell phone': 0.3,
-            'laptop': 0.4,
-            'book': 0.8,
-            'clock': 0.2,
-            'scissors': 0.9,
-            'toothbrush': 0.9
-        }
+    def process_directory(self, directory_path: str) -> Dict[str, Any]:
+        """
+        Process all images in a directory
         
-        medical_score = 0.0
-        medical_objects = []
-        
-        for detection in detections:
-            class_name = detection['class_name']
-            confidence = detection['confidence']
+        Args:
+            directory_path: Path to directory containing images
             
-            if class_name in medical_keywords:
-                relevance_score = medical_keywords[class_name] * confidence
-                medical_score += relevance_score
-                medical_objects.append({
-                    'object': class_name,
-                    'confidence': confidence,
-                    'relevance_score': relevance_score
-                })
+        Returns:
+            Dict containing processing results
+        """
+        if not os.path.exists(directory_path):
+            return {
+                'status': 'failed',
+                'error': f'Directory not found: {directory_path}',
+                'images_processed': 0,
+                'detections_found': 0
+            }
         
-        # Normalize medical score
-        if medical_objects:
-            medical_score = medical_score / len(medical_objects)
+        image_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff']
+        processed_images = 0
+        total_detections = 0
+        all_detections = []
+        
+        # Walk through directory
+        for root, dirs, files in os.walk(directory_path):
+            for file in files:
+                if any(file.lower().endswith(ext) for ext in image_extensions):
+                    image_path = os.path.join(root, file)
+                    
+                    try:
+                        result = self.process_image(image_path)
+                        
+                        if result['status'] == 'success':
+                            processed_images += 1
+                            total_detections += result['total_detections']
+                            all_detections.extend(result['detections'])
+                            
+                            logger.info(f"Processed {file}: {result['total_detections']} detections")
+                        else:
+                            logger.warning(f"Failed to process {file}: {result['error']}")
+                    
+                    except Exception as e:
+                        logger.error(f"Error processing {file}: {e}")
         
         return {
-            'medical_score': medical_score,
-            'medical_objects': medical_objects,
-            'is_medical_content': medical_score > 0.5
+            'status': 'success',
+            'images_processed': processed_images,
+            'detections_found': total_detections,
+            'detections': all_detections
         }
     
-    def process_image_batch(self, image_paths: List[str]) -> List[Dict[str, Any]]:
-        """Process multiple images in batch"""
-        results = []
+    def save_detections(self, detections: List[Dict[str, Any]], output_path: str):
+        """
+        Save detection results to JSON file
         
-        for image_path in image_paths:
-            if os.path.exists(image_path):
-                detection_result = self.detect_objects(image_path)
-                medical_analysis = self.analyze_medical_relevance(detection_result['detections'])
-                
-                result = {
-                    'image_path': image_path,
-                    'detection_results': detection_result,
-                    'medical_analysis': medical_analysis,
-                    'processed_at': str(np.datetime64('now'))
-                }
-                results.append(result)
-            else:
-                print(f"Image not found: {image_path}")
-                
-        return results
-    
-    def save_results(self, results: List[Dict[str, Any]], output_path: str):
-        """Save detection results to JSON file"""
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        
-        with open(output_path, 'w') as f:
-            json.dump(results, f, indent=2, default=str)
+        Args:
+            detections: List of detection results
+            output_path: Path to save the JSON file
+        """
+        try:
+            # Create output directory if it doesn't exist
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
-        print(f"Saved {len(results)} results to {output_path}")
-
-def main():
-    """Test function for YOLO enricher"""
-    enricher = YOLOEnricher()
+            # Add metadata
+            output_data = {
+                'timestamp': datetime.now().isoformat(),
+                'model_path': self.model_path,
+                'confidence_threshold': self.confidence_threshold,
+                'total_detections': len(detections),
+                'detections': detections
+            }
+            
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(output_data, f, indent=2)
+            
+            logger.info(f"Saved {len(detections)} detections to {output_path}")
+            
+        except Exception as e:
+            logger.error(f"Error saving detections: {e}")
     
-    # Test with a sample image (replace with actual image path)
-    test_image = "test_image.jpg"
-    
-    if os.path.exists(test_image):
-        result = enricher.detect_objects(test_image)
-        medical_analysis = enricher.analyze_medical_relevance(result['detections'])
+    def get_medical_detections(self, detections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter detections for medical-related content
         
-        print(f"Detected {result['total_detections']} objects")
-        print(f"Medical score: {medical_analysis['medical_score']:.2f}")
-        print(f"Is medical content: {medical_analysis['is_medical_content']}")
-    else:
-        print(f"Test image {test_image} not found")
-
-if __name__ == "__main__":
-    main() 
+        Args:
+            detections: List of all detections
+            
+        Returns:
+            List of medical-related detections
+        """
+        medical_keywords = [
+            'person', 'human', 'face', 'head', 'body',
+            'medical', 'hospital', 'doctor', 'patient',
+            'medicine', 'pill', 'tablet', 'syringe',
+            'bandage', 'wound', 'injury'
+        ]
+        
+        medical_detections = []
+        
+        for detection in detections:
+            class_name = detection['class'].lower()
+            
+            # Check if detection class contains medical keywords
+            if any(keyword in class_name for keyword in medical_keywords):
+                medical_detections.append(detection)
+        
+        return medical_detections 

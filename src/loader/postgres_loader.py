@@ -152,6 +152,27 @@ class PostgresLoader:
             
         return inserted_count
     
+    def execute_query(self, query: str, params: tuple = None) -> None:
+        """Execute a SQL query"""
+        if not self.conn:
+            self.connect()
+            
+        cursor = self.conn.cursor()
+        
+        try:
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            self.conn.commit()
+            
+        except Exception as e:
+            self.conn.rollback()
+            print(f"Error executing query: {e}")
+            raise
+        finally:
+            cursor.close()
+    
     def get_raw_messages(self, limit: int = 100) -> List[Dict[str, Any]]:
         """Retrieve raw messages from PostgreSQL"""
         if not self.conn:

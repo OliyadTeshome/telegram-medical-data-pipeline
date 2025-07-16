@@ -27,7 +27,9 @@ class Config:
         
         # Database URLs
         self.database_url = os.getenv('DATABASE_URL')
-        self.dbt_profiles_dir = os.getenv('DBT_PROFILES_DIR', '/app/dbt')
+        # Use relative path for dbt profiles directory
+        default_dbt_dir = os.path.join(os.getcwd(), 'dbt')
+        self.dbt_profiles_dir = os.getenv('DBT_PROFILES_DIR', default_dbt_dir)
         
         # FastAPI Configuration
         self.fastapi_host = os.getenv('FASTAPI_HOST', '0.0.0.0')
@@ -39,9 +41,11 @@ class Config:
         self.dagster_host = os.getenv('DAGSTER_HOST', '0.0.0.0')
         self.dagster_port = int(os.getenv('DAGSTER_PORT', '3000'))
         
-        # Data Storage
-        self.raw_data_path = os.getenv('RAW_DATA_PATH', '/app/data/raw')
-        self.processed_data_path = os.getenv('PROCESSED_DATA_PATH', '/app/data/processed')
+        # Data Storage - Use relative paths for Windows compatibility
+        default_raw_path = os.path.join(os.getcwd(), 'data', 'raw')
+        default_processed_path = os.path.join(os.getcwd(), 'data', 'processed')
+        self.raw_data_path = os.getenv('RAW_DATA_PATH', default_raw_path)
+        self.processed_data_path = os.getenv('PROCESSED_DATA_PATH', default_processed_path)
         
         # YOLO Configuration
         self.yolo_model_path = os.getenv('YOLO_MODEL_PATH', '/app/models/yolov8n.pt')

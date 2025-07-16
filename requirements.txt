@@ -20,9 +20,10 @@ pillow==10.1.0
 
 # Orchestration
 dagster==1.5.8
-dagster-postgres==1.5.8
+dagster-postgres==0.22.6
 
 # Utilities
 requests==2.31.0
 aiofiles==23.2.1
-python-multipart==0.0.6 
+python-multipart==0.0.6
+nest-asyncio==1.5.8 

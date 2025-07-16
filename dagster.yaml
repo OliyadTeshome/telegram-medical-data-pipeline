@@ -1,0 +1,40 @@
+# Dagster workspace configuration
+# This file configures the Dagster workspace for the Telegram medical data pipeline
+
+# Workspace settings
+workspace:
+  # Load code from the current directory
+  - module_name: dags.telegram_pipeline
+
+# Instance settings
+instance:
+  # Use local SQLite for metadata storage
+  sqlite:
+    base_dir: ".dagster"
+
+# Logging configuration
+logging:
+  python_logging:
+    level: INFO
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Scheduler settings
+scheduler:
+  # Enable the scheduler
+  enabled: true
+
+# Run launcher settings
+run_launcher:
+  # Use the default in-process run launcher
+  module: dagster.core.launcher
+  class: InProcessRunLauncher
+
+# Storage settings
+storage:
+  # Use local file system for storage
+  sqlite:
+    base_dir: ".dagster"
+
+# Telemetry settings (optional)
+telemetry:
+  enabled: false 
