@@ -14,7 +14,7 @@ dbt-core==1.7.3
 dbt-postgres==1.7.3
 
 # Computer vision
-ultralytics==8.0.196
+ultralytics==8.3.174
 opencv-python==4.8.1.78
 pillow==10.1.0
 
