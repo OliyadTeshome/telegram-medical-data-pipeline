@@ -10,7 +10,7 @@ authors = [{name = "Your Name", email = "your.email@example.com"}]
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "telethon==1.32.1",
+    "telethon==1.40.0",
     "psycopg2-binary==2.9.9",
     "sqlalchemy==2.0.23",
     "python-dotenv==1.0.0",
